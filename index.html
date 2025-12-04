@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Web Termux</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: #000; 
+            font-family: 'Courier New', monospace;
+            color: #00ff88;
+            padding: 20px;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .terminal {
+            background: #000;
+            height: calc(100vh - 40px);
+            overflow-y: auto;
+            padding: 10px;
+            border: 2px solid #00ff88;
+            border-radius: 5px;
+        }
+        .output { margin-bottom: 10px; }
+        .prompt { color: #ff79c6; }
+        .command { color: #00ff88; }
+        .error { color: #ff5555; }
+        .success { color: #50fa7b; }
+        .info { color: #8be9fd; }
+        #inputLine {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+        }
+        #cmdInput {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            outline: none;
+            padding-left: 5px;
+        }
+        .quick-cmd {
+            background: #333;
+            color: #fff;
+            border: 1px solid #00ff88;
+            padding: 3px 8px;
+            margin: 5px 2px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .quick-cmd:hover { background: #444; }
+        .file-input { display: none; }
+        .menu-bar {
+            display: flex;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="terminal" id="terminal">
+        <div class="menu-bar">
+            <button class="quick-cmd" onclick="runCmd('help')">help</button>
+            <button class="quick-cmd" onclick="runCmd('neofetch')">neofetch</button>
+            <button class="quick-cmd" onclick="runCmd('pkg list')">pkg list</button>
+            <button class="quick-cmd" onclick="runCmd('ls -la')">ls -la</button>
+            <button class="quick-cmd" onclick="runCmd('clear')">Clear</button>
+            <button class="quick-cmd" onclick="runCmd('calc')">calc</button>
+            <button class="quick-cmd" onclick="runCmd('weather')">weather</tip>
+            <button class="quick-cmd" onclick="runCmd('joke')">joke</button>
+            <button class="quick-cmd" onclick="runCmd('quote')">quote</button>
+            <button class="quick-cmd" onclick="exportFiles()">Export</button>
+            <button class="quick-cmd" onclick="importFiles()">Import</button>
+        </div>
+        
+        <div class="output" id="output">
+            <pre style="color:#ff79c6">
+  ████████╗███████╗██████╗ ███╗   ███╗██╗   ██╗██╗  ██╗
+  ╚══██╔══╝██╔════╝██╔══██╗████╗ ████║██║   ██║╚██╗██╔╝
+     ██║   █████╗  ██████╔╝██╔████╔██║██║   ██║ ╚███╔╝ 
+     ██║   ██╔══╝  ██╔══██╗██║╚██╔╝██║██║   ██║ ██╔██╗ 
+     ██║   ███████╗██║  ██║██║ ╚═╝ ██║╚██████╔╝██╔╝ ██╗
+     ╚═╝   ╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═╝
+            </pre>
+            <p>Web Termux v2.0 - Веб-интерпретатор команд</p>
+            <p>Введите 'help' для списка команд</p>
+            <hr style="border-color:#333; margin:10px 0;">
+        </div>
+        <div id="inputLine">
+            <span class="prompt">[user@web-termux]~$ </span>
+            <input type="text" id="cmdInput" autocomplete="off" autofocus>
+        </div>
+    </div>
+
+    <input type="file" id="fileImport" class="file-input" multiple accept=".py,.js,.html,.css,.txt,.json,.md,.java,.c,.cpp,.cs,.php,.rb,.go,.rs,.ts,.sh,.bat,.ps1">
+
+    <script>
+        const output = document.getElementById('output');
+        const cmdInput = document.getElementById('cmdInput');
+        const terminal = document.getElementById('terminal');
+        const fileImport = document.getElementById('fileImport');
+        let cmdHistory = [];
+        let histIndex = -1;
+        let currentDir = '~';
+
+        // Расширенные команды
+        const commands = {
+            help: () => `Доступные команды:
+• help - эта справка
+• clear - очистить экран
+• neofetch - информация о системе
+• pkg [install/remove/list/upgrade] - управление пакетами
+• ls [опции] - список файлов
+• cd [директория] - сменить директорию
+• cat [файл] - показать файл
+• mkdir [имя] - создать папку
+• rm [файл] - удалить файл
+• python - запуск Python
+• node - запуск Node.js
+• git [команда] - работа с git
+• date - дата и время
+• whoami - имя пользователя
+• echo [текст] - вывод текста
+• calc [выражение] - калькулятор
+• weather - прогноз погоды
+• joke - случайная шутка
+• quote - случайная цитата
+• matrix - эффект матрицы
+• history - история команд
+• export - экспорт файлов
+• import - импорт файлов`,
+
+            neofetch: () => `
+OS: Web Termux v2.0
+Host: Browser ${navigator.userAgent.split(' ')[0]}
+Kernel: JavaScript ES6
+Uptime: Always online
+Shell: web-termux
+Terminal: ${navigator.platform}
+CPU: Virtual processor
+Memory: Unlimited (browser)
+Directory: ${currentDir}
+`,
+
+            'pkg list': () => `Установленные пакеты:
+• termux-tools
+• python
+• nodejs
+• git
+• nano
+• curl
+• wget
+• ssh
+• clang
+• make
+• vim`,
+
+            'pkg install': (args) => `Установка ${args || 'пакета'}... [симуляция]`,
+            'pkg upgrade': () => `Обновление всех пакетов... [симуляция]`,
+
+            'ls': (args) => {
+                const files = {
+                    'index.html': '1.2K',
+                    'script.js': '4.8K',
+                    'style.css': '2.1K',
+                    'README.md': '0.5K',
+                    'main.py': '3.4K',
+                    'app.js': '5.2K',
+                    'projects/': 'DIR',
+                    'downloads/': 'DIR',
+                    'documents/': 'DIR',
+                    'code/': 'DIR'
+                };
+                if (args && args.includes('-la')) {
+                    return Object.entries(files).map(([name, size]) => 
+                        `${size === 'DIR' ? 'drwxr-xr-x' : '-rw-r--r--'} 1 user user ${size.padStart(6)} ${name}`
+                    ).join('\n');
+                }
+                return Object.keys(files).join('  ');
+            },
+
+            'cd': (dir) => {
+                currentDir = dir || '~';
+                return `Переход в ${currentDir}`;
+            },
+
+            'cat': (file) => {
+                const fileContents = {
+                    'main.py': 'print("Hello from Python!")\n# Web Termux simulation',
+                    'app.js': 'console.log("Node.js app");\n// Web Termux simulation',
+                    'README.md': '# Web Termux\nВеб-симулятор терминала'
+                };
+                return fileContents[file] || `Содержимое ${file || 'файла'}:\n# ${new Date().toLocaleString()}`;
+            },
+
+            'mkdir': (name) => `Создана директория: ${name || 'new_folder'}`,
+            'rm': (file) => `Удален: ${file || 'файл'}`,
+
+            'python': () => `Python 3.10.0 (симуляция)
+>>> print("Hello from Web Termux!")
+Hello from Web Termux!
+>>> exit()`,
+
+            'node': () => `Node.js v18.0.0 (симуляция)
+> console.log("Web Termux rocks!")
+Web Termux rocks!
+> .exit`,
+
+            'git': (args) => `git ${args || '--version'}
+git version 2.35.1 (симуляция)`,
+
+            'date': () => new Date().toLocaleString('ru-RU'),
+            'whoami': () => 'web-termux-user',
+            'echo': (text) => text || '',
+
+            'calc': (expr) => {
+                try {
+                    return expr ? `= ${eval(expr.replace(/[^0-9+\-*/().]/g, ''))}` : 'Введите выражение';
+                } catch {
+                    return 'Ошибка вычисления';
+                }
+            },
+
+            'weather': () => {
+                const forecasts = [
+                    '☀️  Ясно, +22°C',
+                    '⛅  Переменная облачность, +18°C',
+                    '🌧️  Дождь, +15°C',
+                    '❄️  Снег, -5°C',
+                    '🌤️  Малооблачно, +20°C'
+                ];
+                return `Прогноз: ${forecasts[Math.floor(Math.random() * forecasts.length)]}`;
+            },
+
+            'joke': () => {
+                const jokes = [
+                    'Почему программисты путают Хэллоуин и Рождество? Потому что Oct 31 == Dec 25.',
+                    'Какой у программиста любимый напиток? Java!',
+                    'Сколько программистов нужно, чтобы вкрутить лампочку? Ни одного, это hardware проблема.',
+                    'Программист звонит в библиотеку: "Здравствуйте, есть ли у вас книги про депрессию?"\nБиблиотекарь: "Да, но они никогда не возвращаются..."'
+                ];
+                return jokes[Math.floor(Math.random() * jokes.length)];
+            },
+
+            'quote': () => {
+                const quotes = [
+                    'Программирование — это разбиение чего-то большого и невозможного на что-то маленькое и вполне реальное.',
+                    'Код — это поэзия, понятная компьютерам.',
+                    'Сначала сделайте это работающим, затем сделайте это правильно, и только потом сделайте это быстрым.',
+                    'Лучший код — это тот код, который никогда не был написан.'
+                ];
+                return `"${quotes[Math.floor(Math.random() * quotes.length)]}"`;
+            },
+
+            'matrix': () => {
+                const lines = [];
+                for (let i = 0; i < 10; i++) {
+                    lines.push(Array(30).fill(0).map(() => Math.random() > 0.5 ? '1' : '0').join(''));
+                }
+                return lines.join('\n');
+            },
+
+            'history': () => cmdHistory.length ? cmdHistory.join('\n') : 'История пуста',
+
+            'clear': () => { output.innerHTML = ''; return ''; }
+        };
+
+        // Запуск команды
+        function runCmd(cmd) {
+            if (!cmd) return;
+            
+            const cmdLine = document.createElement('div');
+            cmdLine.innerHTML = `<span class="prompt">[user@web-termux]${currentDir}$ </span><span class="command">${cmd}</span>`;
+            output.appendChild(cmdLine);
+            
+            cmdHistory.push(cmd);
+            histIndex = cmdHistory.length;
+            
+            const parts = cmd.split(' ');
+            const baseCmd = parts[0];
+            const args = parts.slice(1).join(' ');
+            
+            let result = '';
+            if (commands[baseCmd]) {
+                result = commands[baseCmd](args);
+            } else if (commands[cmd]) {
+                result = commands[cmd]();
+            } else {
+                result = `bash: ${baseCmd}: команда не найдена\nВведите 'help' для списка команд`;
+            }
+            
+            if (result) {
+                const resultDiv = document.createElement('div');
+                resultDiv.className = baseCmd === 'clear' ? '' : 'info';
+                resultDiv.textContent = result;
+                output.appendChild(resultDiv);
+            }
+            
+            cmdInput.value = '';
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        // Экспорт файлов
+        function exportFiles() {
+            const codeFiles = {
+                'example.py': 'print("Hello from Web Termux!")\n# Экспортированный файл',
+                'script.js': 'console.log("Exported from Web Termux");',
+                'README.md': '# Экспорт из Web Termux\nЭто пример экспорта файлов.'
+            };
+            
+            Object.entries(codeFiles).forEach(([name, content]) => {
+                const blob = new Blob([content], {type: 'text/plain'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = name;
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+            
+            runCmd('echo "Файлы экспортированы"');
+        }
+
+        // Импорт файлов
+        function importFiles() {
+            fileImport.click();
+        }
+
+        // Обработка импорта файлов
+        fileImport.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            const allowedExt = ['.py','.js','.html','.css','.txt','.json','.md','.java','.c','.cpp','.cs','.php','.rb','.go','.rs','.ts','.sh','.bat','.ps1'];
+            
+            files.forEach(file => {
+                const ext = '.' + file.name.split('.').pop().toLowerCase();
+                if (allowedExt.includes(ext)) {
+                    runCmd(`echo "Импортирован: ${file.name}"`);
+                } else {
+                    runCmd(`echo "Ошибка: ${file.name} - недопустимый формат"`);
+                }
+            });
+            
+            fileImport.value = '';
+        });
+
+        // Обработка ввода
+        cmdInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                runCmd(cmdInput.value.trim());
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (histIndex > 0) {
+                    histIndex--;
+                    cmdInput.value = cmdHistory[histIndex] || '';
+                }
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (histIndex < cmdHistory.length - 1) {
+                    histIndex++;
+                    cmdInput.value = cmdHistory[histIndex] || '';
+                } else {
+                    histIndex = cmdHistory.length;
+                    cmdInput.value = '';
+                }
+            } else if (e.key === 'Tab') {
+                e.preventDefault();
+                const input = cmdInput.value.trim();
+                const matches = Object.keys(commands).filter(cmd => cmd.startsWith(input));
+                if (matches.length === 1) {
+                    cmdInput.value = matches[0];
+                }
+            }
+        });
+
+        // Автофокус
+        document.addEventListener('click', () => cmdInput.focus());
+        cmdInput.focus();
+        
+        // Приветственное сообщение
+        setTimeout(() => {
+            runCmd('echo "Добро пожаловать в Web Termux v2.0!"');
+        }, 500);
+    </script>
+</body>
+</html>
